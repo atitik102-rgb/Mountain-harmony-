@@ -63,27 +63,33 @@ async function ensureSeed(database) {
 }
 
 // 5. Handler GET (Memanggil helper getConnectedDb)
+
 export async function GET(request, { params }) {
   try {
-    // Panggil helper untuk mendapatkan koneksi DB yang valid
+    console.log(' [DEBUG] GET handler dipanggil');
+    
     const { db } = await getConnectedDb();
+    console.log('✅ [DEBUG] Database terhubung');
     
-    // Jalankan seed data jika collection masih kosong
     await ensureSeed(db);
+    console.log('🌱 [DEBUG] ensureSeed selesai');
     
-    // Logika routing dinamis sesuai kode asli Anda
+    // Cek apakah collection packages ada data
+    const count = await db.collection('packages').countDocuments();
+    console.log(`📊 [DEBUG] Jumlah dokumen di packages: ${count}`);
+    
     const path = (await params)?.path || [];
     
-    // Contoh logika sederhana (sesuaikan dengan kebutuhan API Anda)
     if (path.length === 0) {
        const packages = await db.collection('packages').find({}).toArray();
+       console.log('📦 [DEBUG] Mengirim data packages:', packages.length, 'item');
        return NextResponse.json({ success: true, data: packages });
     }
     
     return NextResponse.json({ message: "Route found", path });
     
   } catch (error) {
-    console.error("Database Error:", error);
+    console.error("❌ [DEBUG ERROR]", error);
     return NextResponse.json(
       { error: "Internal Server Error", details: error.message }, 
       { status: 500 }

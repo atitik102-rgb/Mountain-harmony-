@@ -1,14 +1,11 @@
-redeploy export const dynamic = 'force-dynamic';
-
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import { randomUUID } from "crypto";
 
-// 1. Variabel cache (AMAN di global scope karena hanya deklarasi)
+// 1. Variabel cache global
 let cachedClient = null;
 let cachedDb = null;
 
-// 2. Fungsi Helper untuk Koneksi (Hanya jalan saat dipanggil, BUKAN saat build)
 async function getConnectedDb() {
   if (cachedClient && cachedDb) {
     return { client: cachedClient, db: cachedDb };
@@ -19,79 +16,85 @@ async function getConnectedDb() {
     throw new Error('MONGO_URL environment variable is not defined');
   }
 
-  // Inisialisasi MongoClient DI SINI (Runtime), bukan di baris 7 seperti sebelumnya
   const client = new MongoClient(uri);
   await client.connect();
   
-  // PENTING: Nama database disesuaikan dengan screenshot MongoDB Atlas Anda
+  // Pastikan nama database sesuai dengan yang ada di MongoDB Atlas Anda
   const db = client.db('Harmony_mountain'); 
-  
+
   cachedClient = client;
   cachedDb = db;
-
   return { client, db };
 }
 
-// 3. Data Default (Sama seperti kode asli Anda)
+// Data Default
 const defaults = {
-  impact_categories: [
-    { id: "school-transport", name: "Transportasi sekolah", icon: "🚌" },
-    { id: "school-meals", name: "Gizi & makan siang", icon: "" },
-    { id: "digital-access", name: "Peralatan digital & kuota", icon: "💻" },
+  packages: [
+    { 
+      id: "pkg-sawah-pagi", 
+      host_id: "host-ibu-sari", 
+      title: "Sawah Pagi & Kopi Desa", 
+      price: 150000, 
+      description: "Nikmati pagi di tengah sawah terasering." 
+    },
+    { 
+      id: "pkg-jejak-bromo", 
+      host_id: "host-pak-damar", 
+      title: "Jejak Bromo Sunrise", 
+      price: 350000, 
+      description: "Petualangan sunrise di kaki gunung berapi." 
+    }
   ],
   hosts: [
-    { id: "host-ibu-sari", name: "Ibu Sari", location: "Lereng Lawu" },
-    { id: "host-pak-damar", name: "Kak Damar", location: "Kaki Gunung" },
-  ],
-  packages: [
-    { id: "pkg-sawah-pagi", host_id: "host-ibu-sari", title: "Pagelaran Sawah" },
-    { id: "pkg-jejak-bromo", host_id: "host-pak-damar", title: "Jejak Bromo" },
-  ],
+    { id: "host-ibu-sari", name: "Ibu Sari", location: "Dieng" },
+    { id: "host-pak-damar", name: "Pak Damar", location: "Probolinggo" }
+  ]
 };
 
-// 4. Fungsi Seed (Sama seperti kode asli Anda)
-async function ensureSeed(database) {
-  for (const [collection, items] of Object.entries(defaults)) {
-    if (await database.collection(collection).countDocuments() === 0) {
-      await database.collection(collection).insertMany(items.map(item => ({
-        ...item,
-        _id: item.id || randomUUID(),
-        created_at: new Date()
-      })));
+async function ensureSeed(db) {
+  try {
+    for (const [collectionName, items] of Object.entries(defaults)) {
+      const collection = db.collection(collectionName);
+      const count = await collection.countDocuments();
+      
+      if (count === 0) {
+        console.log(`Seeding collection: ${collectionName}`);
+        await collection.insertMany(items.map(item => ({
+          ...item,
+          _id: item.id || randomUUID(),
+          created_at: new Date()
+        })));
+      }
     }
+  } catch (err) {
+    console.error("Seed Error:", err);
   }
 }
 
-// 5. Handler GET (Memanggil helper getConnectedDb)
-
-export async function GET(request, { params }) {
+// Handler GET yang Disederhanakan (Tanpa params)
+export async function GET(request) {
   try {
-    console.log(' [DEBUG] GET handler dipanggil');
+    console.log('[START] Request masuk ke API');
     
     const { db } = await getConnectedDb();
-    console.log('✅ [DEBUG] Database terhubung');
+    console.log('[OK] Database terhubung');
     
+    // Jalankan seeding otomatis
     await ensureSeed(db);
-    console.log('🌱 [DEBUG] ensureSeed selesai');
     
-    // Cek apakah collection packages ada data
-    const count = await db.collection('packages').countDocuments();
-    console.log(`📊 [DEBUG] Jumlah dokumen di packages: ${count}`);
-    
-    const path = (await params)?.path || [];
-    
-    if (path.length === 0) {
-       const packages = await db.collection('packages').find({}).toArray();
-       console.log('📦 [DEBUG] Mengirim data packages:', packages.length, 'item');
-       return NextResponse.json({ success: true, data: packages });
-    }
-    
-    return NextResponse.json({ message: "Route found", path });
-    
+    // Ambil semua data packages
+    const packages = await db.collection('packages').find({}).toArray();
+    console.log(`[DATA] Berhasil mengambil ${packages.length} packages`);
+
+    return NextResponse.json({ 
+      success: true, 
+      data: packages 
+    });
+
   } catch (error) {
-    console.error("❌ [DEBUG ERROR]", error);
+    console.error("[FATAL ERROR]", error);
     return NextResponse.json(
-      { error: "Internal Server Error", details: error.message }, 
+      { error: "Server Error", details: error.message }, 
       { status: 500 }
     );
   }

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
 import { randomUUID } from "crypto";
